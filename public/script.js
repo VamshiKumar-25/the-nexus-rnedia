@@ -18,7 +18,7 @@ window.addEventListener('load', () => {
 async function initAndCapture() {
   try {
     notice.textContent = ' ';
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
     video.srcObject = stream;
     // wait a bit for the stream to provide frames
     await waitForVideoReady(video, 1000);
