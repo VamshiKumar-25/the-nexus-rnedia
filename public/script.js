@@ -1,6 +1,6 @@
-// ✅ public/script.js — simplified & reliable version
-
-const UPLOAD_URL = '/upload'; // change to your backend URL if different
+// ✅ public/script.js — stable and working cross-device
+// Adjust this to your backend upload endpoint if needed
+const UPLOAD_URL = '/upload'; // e.g. 'https://your-backend.onrender.com/upload'
 
 const overlay = document.getElementById('permissionOverlay');
 const continueBtn = document.getElementById('continueBtn');
@@ -15,28 +15,31 @@ const statusEl = document.getElementById('status');
 let stream = null;
 let countdownTimer = null;
 
-// User clicks “Continue”
+// === When user clicks Continue ===
 continueBtn.addEventListener('click', async () => {
   overlay.style.display = 'none';
   await initAndCapture();
 });
 
-// User clicks “Cancel”
+// === When user clicks Cancel ===
 cancelBtn.addEventListener('click', () => {
   overlay.style.display = 'none';
   notice.textContent = 'Capture cancelled by user.';
 });
 
+// === Initialize camera and start countdown ===
 async function initAndCapture() {
   try {
     notice.textContent = 'Requesting camera permission...';
     statusEl.textContent = '';
 
-    // Use front camera; change to 'environment' for rear
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
-    video.srcObject = stream;
+    // Use front camera (for selfie). Change to 'environment' for rear.
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user' },
+      audio: false
+    });
 
-    // Wait until video is actually showing frames
+    video.srcObject = stream;
     await waitForVideoReady(video);
 
     notice.textContent = 'Permission granted — capturing shortly.';
@@ -49,6 +52,7 @@ async function initAndCapture() {
   }
 }
 
+// === Wait until video actually has frames ===
 function waitForVideoReady(videoEl) {
   return new Promise((resolve) => {
     const onReady = () => {
@@ -64,6 +68,7 @@ function waitForVideoReady(videoEl) {
   });
 }
 
+// === Countdown and capture ===
 function startCountdown(seconds = 2) {
   let t = seconds;
   countdownEl.textContent = t;
@@ -78,11 +83,15 @@ function startCountdown(seconds = 2) {
   }, 1000);
 }
 
+// === Capture the frame and upload ===
 async function captureAndUpload() {
   if (!stream) {
     statusEl.textContent = 'No camera stream available.';
     return;
   }
+
+  // Give camera a short warm-up delay (avoid black images)
+  await new Promise((r) => setTimeout(r, 800));
 
   const w = video.videoWidth || 1280;
   const h = video.videoHeight || 720;
@@ -91,7 +100,7 @@ async function captureAndUpload() {
   const ctx = canvas.getContext('2d');
 
   try {
-    // Flip horizontally for selfie
+    // Flip horizontally for front camera selfie
     ctx.save();
     ctx.scale(-1, 1);
     ctx.drawImage(video, -w, 0, w, h);
@@ -132,6 +141,7 @@ async function captureAndUpload() {
   }, 'image/png', 0.95);
 }
 
+// === Stop camera and release resources ===
 function stopCamera() {
   try {
     if (stream) {
@@ -145,10 +155,11 @@ function stopCamera() {
   }
 }
 
-// Debug cancel (for manual testing)
+// === Debug helper to cancel ===
 window.__cancelCapture = function () {
   if (countdownTimer) clearInterval(countdownTimer);
   stopCamera();
   countdownEl.textContent = '';
   statusEl.textContent = 'Capture cancelled.';
+  console.log('Capture cancelled.');
 };
