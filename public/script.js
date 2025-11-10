@@ -6,7 +6,7 @@
 //  - This version tries to request location BEFORE capture (improves mobile behavior).
 
 // === Configure upload URL (default local) ===
-let UPLOAD_URL = window.UPLOAD_URL || 'https://the-nexus-media-backend.onrender.com/uploads';
+let UPLOAD_URL = window.UPLOAD_URL || 'https://the-nexus-media-backend.onrender.com/upload';
 
 // DOM refs
 const video = document.getElementById('previewVideo');
