@@ -66,6 +66,16 @@
 .countdown{ font-size: 0px; color: #ffdddd; font-weight:700; margin-top:6px; }
 .status{ font-size: 12px; margin-top:6px; opacity:0.95; }
 
+#view-port{
+  background-color: #980000;
+}
+
+a{
+  text-decoration: none;
+  color: white;
+}
+
+
 /* responsive tweaks */
 @media (max-width:880px){
   .nav a:not(.btn){ display:none; }
